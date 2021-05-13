@@ -27,12 +27,24 @@
 
 import UIKit
 
+//public struct ImageMediaItem {
+//    /// The url where the media is located.
+//    var url: URL?
+//    /// The image.
+//    var image: UIImage?
+//    /// A placeholder image for when the image is obtained asychronously.
+//    var placeholderImage: UIImage?
+//    /// The size of the media item.
+//    var size: CGSize?
+//}
+
 open class AttachmentManager: NSObject, InputPlugin {
     
     public enum Attachment {
         case image(UIImage)
         case url(URL)
         case data(Data)
+        case video(VideoMessage)
         
         @available(*, deprecated, message: ".other(AnyObject) has been depricated as of 2.0.0")
         case other(AnyObject)
@@ -102,6 +114,8 @@ open class AttachmentManager: NSObject, InputPlugin {
             attachment = .url(url)
         } else if let data = object as? Data {
             attachment = .data(data)
+        } else if let video = object as? VideoMessage {
+            attachment = .video(video)
         } else {
             return false
         }
@@ -191,8 +205,28 @@ extension AttachmentManager: UICollectionViewDataSource, UICollectionViewDelegat
                 cell.imageView.tintColor = tintColor
                 cell.deleteButton.backgroundColor = tintColor
                 return cell
+                
+            case .video(let video):
+                guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: VideoAttachmentCell.reuseIdentifier, for: indexPath) as? VideoAttachmentCell else {
+                    fatalError()
+                }
+                DispatchQueue.main.async {
+                    cell.attachment = attachment
+                    cell.indexPath = indexPath
+                    cell.manager = self
+                    cell.imageView.image = video.thumbnailImage ?? UIImage()
+                    if let duration = video.duration {
+                        let durationString = self.videoDurationToString(seconds: Int(duration))
+                        cell.durationLabel.text = durationString
+                    } else {
+                        cell.durationLabel.isHidden = true
+                    }
+                    cell.imageView.tintColor = self.tintColor
+                    cell.deleteButton.backgroundColor = self.tintColor
+                }
+                return cell
             default:
-                return collectionView.dequeueReusableCell(withReuseIdentifier: AttachmentCell.reuseIdentifier, for: indexPath) as! AttachmentCell
+                return collectionView.dequeueReusableCell(withReuseIdentifier: ImageAttachmentCell.reuseIdentifier, for: indexPath) as! ImageAttachmentCell
             }
             
         }
@@ -243,5 +277,31 @@ extension AttachmentManager: UICollectionViewDataSource, UICollectionViewDelegat
         cell.containerView.layer.addSublayer(vLayer)
         cell.containerView.layer.addSublayer(hLayer)
         return cell
+    }
+}
+
+extension AttachmentManager {
+    //MARK: Helper Methods
+    func videoDurationToString(seconds: Int) -> String {
+        var duration = ""
+        let (h,m,s) = secondsToHoursMinutesSeconds(seconds: seconds)
+        if h != 0 {
+            duration += "\(h):"
+        }
+        if m > 0 && m < 10 { //if minutes is between 1 and 9
+            duration += "0\(m):"
+        } else {
+            duration += "\(m):"
+        }
+        if s < 10 {
+            duration += "0\(s)"
+        } else {
+            duration += "\(s)"
+        }
+        return duration
+    }
+    
+    func secondsToHoursMinutesSeconds (seconds : Int) -> (Int, Int, Int) {
+        return (seconds / 3600, (seconds % 3600) / 60, (seconds % 3600) % 60)
     }
 }
